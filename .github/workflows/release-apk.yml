@@ -32,6 +32,20 @@ jobs:
       - name: Generate Android scaffolding
         run: flutter create --platforms android --project-name umami_android --org app.blackpirate.umami .
 
+      - name: Configure Android network access
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          manifest_path = Path("android/app/src/main/AndroidManifest.xml")
+          text = manifest_path.read_text()
+          permission = '    <uses-permission android:name="android.permission.INTERNET" />\n'
+
+          if "android.permission.INTERNET" not in text:
+              text = text.replace("    <application", permission + "\n    <application", 1)
+              manifest_path.write_text(text)
+          PY
+
       - name: Generate ephemeral release keystore
         run: |
           KEYSTORE_PASSWORD="${{ github.run_id }}-release"

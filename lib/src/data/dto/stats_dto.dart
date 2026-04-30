@@ -8,11 +8,16 @@ part 'stats_dto.g.dart';
 @freezed
 class StatsResponseDto with _$StatsResponseDto {
   const factory StatsResponseDto({
+    @JsonKey(fromJson: _metricValueFromJson)
     MetricValueDto? visitors,
+    @JsonKey(fromJson: _metricValueFromJson)
     MetricValueDto? pageviews,
+    @JsonKey(fromJson: _metricValueFromJson)
     MetricValueDto? visits,
+    @JsonKey(fromJson: _metricValueFromJson)
     MetricValueDto? bounces,
-    @JsonKey(name: 'totaltime') MetricValueDto? totalTime,
+    @JsonKey(name: 'totaltime', fromJson: _metricValueFromJson)
+    MetricValueDto? totalTime,
   }) = _StatsResponseDto;
 
   factory StatsResponseDto.fromJson(Map<String, dynamic> json) =>
@@ -28,6 +33,17 @@ class MetricValueDto with _$MetricValueDto {
 
   factory MetricValueDto.fromJson(Map<String, dynamic> json) =>
       _$MetricValueDtoFromJson(json);
+}
+
+MetricValueDto? _metricValueFromJson(Object? value) {
+  return switch (value) {
+    null => null,
+    final Map<String, dynamic> object => MetricValueDto.fromJson(object),
+    final Map object => MetricValueDto.fromJson(
+        Map<String, dynamic>.from(object),
+      ),
+    _ => MetricValueDto(value: _numFromJson(value)),
+  };
 }
 
 num _numFromJson(Object? value) {
