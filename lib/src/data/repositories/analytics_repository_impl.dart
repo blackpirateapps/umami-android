@@ -185,7 +185,7 @@ final class AnalyticsRepositoryImpl implements AnalyticsRepository {
       MetricQuery(
         websiteId: request.websiteId,
         range: request.range,
-        type: MetricType.url,
+        type: MetricType.path,
         limit: 10,
       ),
     );

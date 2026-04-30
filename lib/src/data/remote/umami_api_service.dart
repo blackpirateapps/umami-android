@@ -57,7 +57,7 @@ final class UmamiApiService {
   }) async {
     final response = await _dio.get<Object?>(
       '/api/websites/$websiteId/stats',
-      queryParameters: _rangeQuery(range),
+      queryParameters: _baseRangeQuery(range),
     );
     return StatsResponseDto.fromJson(_readObject(response.data));
   }
@@ -68,7 +68,7 @@ final class UmamiApiService {
   }) async {
     final response = await _dio.get<Object?>(
       '/api/websites/$websiteId/pageviews',
-      queryParameters: _rangeQuery(range),
+      queryParameters: _seriesRangeQuery(range),
     );
     return PageviewsResponseDto.fromJson(_readObject(response.data));
   }
@@ -77,7 +77,7 @@ final class UmamiApiService {
     final response = await _dio.get<Object?>(
       '/api/websites/${query.websiteId}/metrics',
       queryParameters: <String, Object?>{
-        ..._rangeQuery(query.range),
+        ..._baseRangeQuery(query.range),
         ..._filterQuery(query.filters),
         'type': query.type.apiName,
         'offset': query.offset,
@@ -104,17 +104,24 @@ final class UmamiApiService {
     );
   }
 
-  Map<String, Object?> _rangeQuery(AnalyticsDateRange range) {
+  Map<String, Object?> _baseRangeQuery(AnalyticsDateRange range) {
     return <String, Object?>{
       'startAt': _timezoneNormalizer.toEpochMilliseconds(range.startAt),
       'endAt': _timezoneNormalizer.toEpochMilliseconds(range.endAt),
+    };
+  }
+
+  Map<String, Object?> _seriesRangeQuery(AnalyticsDateRange range) {
+    return <String, Object?>{
+      ..._baseRangeQuery(range),
       'unit': range.unit.apiName,
+      'timezone': range.timezone,
     };
   }
 
   Map<String, Object?> _filterQuery(AnalyticsFilters filters) {
     return <String, Object?>{
-      if (filters.url != null) 'url': filters.url,
+      if (filters.url != null) 'path': filters.url,
       if (filters.referrer != null) 'referrer': filters.referrer,
       if (filters.browser != null) 'browser': filters.browser,
       if (filters.os != null) 'os': filters.os,

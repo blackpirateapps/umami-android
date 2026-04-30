@@ -22,6 +22,7 @@ This repository is a Flutter Android client for Umami Analytics REST API v2. It 
 - Dashboard and metric controllers are generated Riverpod auto-dispose providers by default. Long-lived app dependencies are marked `keepAlive`.
 - Umami does not expose a conventional refresh-token endpoint. The auth interceptor refreshes expired JWTs by re-posting `/api/auth/login` with credentials stored in `flutter_secure_storage`.
 - Time-series timestamps are normalized through `TimezoneNormalizer` using the user's local timezone offset captured in `AnalyticsDateRange`.
+- Latest Umami API compatibility matters: `GET /api/websites/:id/metrics` uses `type=path`, not the old v2 `type=url`; URL filters are sent as `path`; pageview series requests include `timezone=UTC`; stats and metrics requests intentionally omit `unit`.
 
 ## Code Generation
 

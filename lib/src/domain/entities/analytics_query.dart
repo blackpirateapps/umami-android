@@ -1,5 +1,5 @@
 enum MetricType {
-  url,
+  path,
   referrer,
   browser,
   os,
@@ -10,7 +10,7 @@ enum MetricType {
 extension MetricTypeApiName on MetricType {
   String get apiName {
     return switch (this) {
-      MetricType.url => 'url',
+      MetricType.path => 'path',
       MetricType.referrer => 'referrer',
       MetricType.browser => 'browser',
       MetricType.os => 'os',
@@ -41,6 +41,7 @@ final class AnalyticsDateRange {
     required this.startAt,
     required this.endAt,
     this.unit = TimeUnit.day,
+    this.timezone = 'UTC',
     this.timezoneOffsetMinutes,
   });
 
@@ -64,6 +65,7 @@ final class AnalyticsDateRange {
       startAt: start,
       endAt: end,
       unit: TimeUnit.day,
+      timezone: 'UTC',
       timezoneOffsetMinutes: localNow.timeZoneOffset.inMinutes,
     );
   }
@@ -71,6 +73,7 @@ final class AnalyticsDateRange {
   final DateTime startAt;
   final DateTime endAt;
   final TimeUnit unit;
+  final String timezone;
   final int? timezoneOffsetMinutes;
 
   @override
@@ -78,6 +81,7 @@ final class AnalyticsDateRange {
         startAt,
         endAt,
         unit,
+        timezone,
         timezoneOffsetMinutes,
       );
 
@@ -87,6 +91,7 @@ final class AnalyticsDateRange {
         other.startAt == startAt &&
         other.endAt == endAt &&
         other.unit == unit &&
+        other.timezone == timezone &&
         other.timezoneOffsetMinutes == timezoneOffsetMinutes;
   }
 }

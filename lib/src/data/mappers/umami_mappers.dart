@@ -140,7 +140,7 @@ final class MetricMapper {
   MetricType metricTypeFromName(String value) {
     return MetricType.values.firstWhere(
       (type) => type.apiName == value,
-      orElse: () => MetricType.url,
+      orElse: () => MetricType.path,
     );
   }
 }
