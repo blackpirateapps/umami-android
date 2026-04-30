@@ -1,0 +1,23 @@
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+build/
+coverage/
+
+# Generated locally by Flutter tooling or Android Studio.
+android/
+ios/
+linux/
+macos/
+web/
+windows/
+
+# Local signing material. CI generates its own ephemeral release keystore.
+*.jks
+android/key.properties
+
+# IDE metadata.
+.idea/
+*.iml
+.vscode/

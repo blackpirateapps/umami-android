@@ -1,0 +1,147 @@
+name: Build release APK
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  release-apk:
+    name: Release APK
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Generate Android scaffolding
+        run: flutter create --platforms android --project-name umami_android --org app.blackpirate.umami .
+
+      - name: Generate ephemeral release keystore
+        run: |
+          keytool -genkeypair \
+            -v \
+            -keystore android/app/release.jks \
+            -storepass "${{ github.run_id }}-store" \
+            -keypass "${{ github.run_id }}-key" \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -alias release \
+            -dname "CN=Black Pirate Apps, OU=CI, O=Black Pirate Apps, L=Remote, S=CI, C=US"
+
+          {
+            echo "storePassword=${{ github.run_id }}-store"
+            echo "keyPassword=${{ github.run_id }}-key"
+            echo "keyAlias=release"
+            echo "storeFile=release.jks"
+          } > android/key.properties
+
+      - name: Configure Android release signing
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          kotlin_path = Path("android/app/build.gradle.kts")
+          groovy_path = Path("android/app/build.gradle")
+
+          if kotlin_path.exists():
+              path = kotlin_path
+              text = path.read_text()
+              imports = "import java.io.FileInputStream\nimport java.util.Properties\n\n"
+              props = """val keystoreProperties = Properties()
+          val keystorePropertiesFile = rootProject.file("key.properties")
+          if (keystorePropertiesFile.exists()) {
+              keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+          }
+
+          """
+              signing = """    signingConfigs {
+                  create("release") {
+                      keyAlias = keystoreProperties["keyAlias"] as String
+                      keyPassword = keystoreProperties["keyPassword"] as String
+                      storeFile = file(keystoreProperties["storeFile"] as String)
+                      storePassword = keystoreProperties["storePassword"] as String
+                  }
+              }
+
+          """
+              if "keystoreProperties" not in text:
+                  text = imports + text
+                  text = text.replace("android {\n", props + "android {\n", 1)
+              if 'create("release")' not in text:
+                  text = text.replace("android {\n", "android {\n" + signing, 1)
+              text = text.replace(
+                  'signingConfig = signingConfigs.getByName("debug")',
+                  'signingConfig = signingConfigs.getByName("release")',
+              )
+              path.write_text(text)
+          elif groovy_path.exists():
+              path = groovy_path
+              text = path.read_text()
+              props = """def keystoreProperties = new Properties()
+          def keystorePropertiesFile = rootProject.file('key.properties')
+          if (keystorePropertiesFile.exists()) {
+              keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+          }
+
+          """
+              signing = """    signingConfigs {
+                  release {
+                      keyAlias keystoreProperties['keyAlias']
+                      keyPassword keystoreProperties['keyPassword']
+                      storeFile file(keystoreProperties['storeFile'])
+                      storePassword keystoreProperties['storePassword']
+                  }
+              }
+
+          """
+              if "keystoreProperties" not in text:
+                  text = "import java.util.Properties\nimport java.io.FileInputStream\n\n" + text
+                  text = text.replace("android {\n", props + "android {\n", 1)
+              if "keyAlias keystoreProperties" not in text:
+                  text = text.replace("android {\n", "android {\n" + signing, 1)
+              text = text.replace(
+                  "signingConfig signingConfigs.debug",
+                  "signingConfig signingConfigs.release",
+              )
+              path.write_text(text)
+          else:
+              raise SystemExit("No Android app Gradle file found after flutter create.")
+          PY
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Generate Dart code
+        run: dart run build_runner build --delete-conflicting-outputs
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Test
+        run: flutter test
+
+      - name: Build release APK
+        run: flutter build apk --release
+
+      - name: Upload release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: umami-android-release-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
