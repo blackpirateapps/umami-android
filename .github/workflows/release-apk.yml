@@ -34,11 +34,13 @@ jobs:
 
       - name: Generate ephemeral release keystore
         run: |
+          KEYSTORE_PASSWORD="${{ github.run_id }}-release"
+
           keytool -genkeypair \
             -v \
             -keystore android/app/release.jks \
-            -storepass "${{ github.run_id }}-store" \
-            -keypass "${{ github.run_id }}-key" \
+            -storepass "$KEYSTORE_PASSWORD" \
+            -keypass "$KEYSTORE_PASSWORD" \
             -keyalg RSA \
             -keysize 2048 \
             -validity 10000 \
@@ -46,8 +48,8 @@ jobs:
             -dname "CN=Black Pirate Apps, OU=CI, O=Black Pirate Apps, L=Remote, S=CI, C=US"
 
           {
-            echo "storePassword=${{ github.run_id }}-store"
-            echo "keyPassword=${{ github.run_id }}-key"
+            echo "storePassword=$KEYSTORE_PASSWORD"
+            echo "keyPassword=$KEYSTORE_PASSWORD"
             echo "keyAlias=release"
             echo "storeFile=release.jks"
           } > android/key.properties
