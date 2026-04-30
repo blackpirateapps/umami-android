@@ -219,7 +219,7 @@ final class LocalAnalyticsDataSource {
             startAt: query.range.startAt,
             endAt: query.range.endAt,
             metricType: query.type.apiName,
-            queryKey: query.cacheKey,
+            queryKey: Value(query.cacheKey),
             offset: query.offset,
             limit: query.limit,
             total: report.total,

@@ -44,11 +44,6 @@ final class AnalyticsDateRange {
     this.timezoneOffsetMinutes,
   });
 
-  final DateTime startAt;
-  final DateTime endAt;
-  final TimeUnit unit;
-  final int? timezoneOffsetMinutes;
-
   factory AnalyticsDateRange.last7Days({DateTime? now}) {
     final localNow = now ?? DateTime.now();
     final end = DateTime(
@@ -73,14 +68,10 @@ final class AnalyticsDateRange {
     );
   }
 
-  @override
-  bool operator ==(Object other) {
-    return other is AnalyticsDateRange &&
-        other.startAt == startAt &&
-        other.endAt == endAt &&
-        other.unit == unit &&
-        other.timezoneOffsetMinutes == timezoneOffsetMinutes;
-  }
+  final DateTime startAt;
+  final DateTime endAt;
+  final TimeUnit unit;
+  final int? timezoneOffsetMinutes;
 
   @override
   int get hashCode => Object.hash(
@@ -89,6 +80,15 @@ final class AnalyticsDateRange {
         unit,
         timezoneOffsetMinutes,
       );
+
+  @override
+  bool operator ==(Object other) {
+    return other is AnalyticsDateRange &&
+        other.startAt == startAt &&
+        other.endAt == endAt &&
+        other.unit == unit &&
+        other.timezoneOffsetMinutes == timezoneOffsetMinutes;
+  }
 }
 
 final class AnalyticsFilters {
