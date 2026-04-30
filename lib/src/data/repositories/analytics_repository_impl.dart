@@ -197,12 +197,36 @@ final class AnalyticsRepositoryImpl implements AnalyticsRepository {
         limit: 10,
       ),
     );
+    final browsersFuture = getMetrics(
+      MetricQuery(
+        websiteId: request.websiteId,
+        range: request.range,
+        type: MetricType.browser,
+        limit: 10,
+      ),
+    );
+    final operatingSystemsFuture = getMetrics(
+      MetricQuery(
+        websiteId: request.websiteId,
+        range: request.range,
+        type: MetricType.os,
+        limit: 10,
+      ),
+    );
+    final devicesFuture = getMetrics(
+      MetricQuery(
+        websiteId: request.websiteId,
+        range: request.range,
+        type: MetricType.device,
+        limit: 10,
+      ),
+    );
     final countriesFuture = getMetrics(
       MetricQuery(
         websiteId: request.websiteId,
         range: request.range,
         type: MetricType.country,
-        limit: 10,
+        limit: 250,
       ),
     );
 
@@ -213,6 +237,9 @@ final class AnalyticsRepositoryImpl implements AnalyticsRepository {
         pageviewsFuture,
         topPagesFuture,
         referrersFuture,
+        browsersFuture,
+        operatingSystemsFuture,
+        devicesFuture,
         countriesFuture,
       ]);
 
@@ -223,6 +250,9 @@ final class AnalyticsRepositoryImpl implements AnalyticsRepository {
           pageviews: _value(await pageviewsFuture),
           topPages: _value(await topPagesFuture),
           referrers: _value(await referrersFuture),
+          browsers: _value(await browsersFuture),
+          operatingSystems: _value(await operatingSystemsFuture),
+          devices: _value(await devicesFuture),
           countries: _value(await countriesFuture),
           fetchedAt: DateTime.now(),
         ),

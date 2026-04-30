@@ -9,6 +9,7 @@ part 'metric_page_controller.g.dart';
 @riverpod
 class MetricPageController extends _$MetricPageController {
   late MetricQuery _query;
+  bool _loadingNextPage = false;
 
   @override
   Future<MetricReport> build(MetricQuery query) async {
@@ -16,9 +17,14 @@ class MetricPageController extends _$MetricPageController {
     return _load(query);
   }
 
+  Future<void> refresh() async {
+    state = const AsyncValue.loading();
+    state = await AsyncValue.guard(() => _load(_query));
+  }
+
   Future<void> loadNextPage() async {
     final current = state.valueOrNull;
-    if (current == null || !current.hasMore) {
+    if (_loadingNextPage || current == null || !current.hasMore) {
       return;
     }
 
@@ -32,17 +38,24 @@ class MetricPageController extends _$MetricPageController {
       search: _query.search,
     );
 
-    state = await AsyncValue.guard(() async {
+    _loadingNextPage = true;
+    try {
       final next = await _load(nextQuery);
-      return MetricReport(
-        type: current.type,
-        rows: [...current.rows, ...next.rows],
-        total: next.total,
-        offset: current.offset,
-        limit: current.limit,
-        fetchedAt: next.fetchedAt,
+      state = AsyncValue.data(
+        MetricReport(
+          type: current.type,
+          rows: [...current.rows, ...next.rows],
+          total: next.total,
+          offset: current.offset,
+          limit: current.limit,
+          fetchedAt: next.fetchedAt,
+        ),
       );
-    });
+    } on Object catch (error, stackTrace) {
+      state = AsyncValue.error(error, stackTrace);
+    } finally {
+      _loadingNextPage = false;
+    }
   }
 
   Future<MetricReport> _load(MetricQuery query) async {
