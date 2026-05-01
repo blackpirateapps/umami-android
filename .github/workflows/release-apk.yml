@@ -57,7 +57,7 @@ jobs:
 
           ANDROID_KEY_PASSWORD="${ANDROID_KEY_PASSWORD:-$ANDROID_KEYSTORE_PASSWORD}"
 
-          for name in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS; do
+          for name in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD; do
             if [ -z "${!name:-}" ]; then
               echo "::error::$name is required."
               exit 1
@@ -85,6 +85,55 @@ jobs:
 
           chmod 600 android/app/release.jks
 
+          if ! keytool -list \
+            -keystore android/app/release.jks \
+            -storepass "$ANDROID_KEYSTORE_PASSWORD" \
+            > "$RUNNER_TEMP/keystore-list.log" \
+            2>&1; then
+            echo "::error::Keystore password is incorrect, or android/app/release.jks is not a readable keystore."
+            cat "$RUNNER_TEMP/keystore-list.log"
+            exit 1
+          fi
+
+          mapfile -t KEYSTORE_ALIASES < <(
+            awk -F, '/^[^,]+, / {gsub(/^[ \t]+|[ \t]+$/, "", $1); print $1}' "$RUNNER_TEMP/keystore-list.log"
+          )
+
+          if [ "${#KEYSTORE_ALIASES[@]}" -eq 0 ]; then
+            echo "::error::No aliases were found in android/app/release.jks."
+            cat "$RUNNER_TEMP/keystore-list.log"
+            exit 1
+          fi
+
+          if [ -z "${ANDROID_KEY_ALIAS:-}" ]; then
+            if [ "${#KEYSTORE_ALIASES[@]}" -eq 1 ]; then
+              ANDROID_KEY_ALIAS="${KEYSTORE_ALIASES[0]}"
+              echo "Detected Android key alias: $ANDROID_KEY_ALIAS"
+            else
+              echo "::error::ANDROID_KEY_ALIAS is required because the keystore contains multiple aliases."
+              printf 'Available aliases:\n'
+              printf '  %s\n' "${KEYSTORE_ALIASES[@]}"
+              exit 1
+            fi
+          fi
+
+          ALIAS_FOUND=false
+          for alias in "${KEYSTORE_ALIASES[@]}"; do
+            if [ "$alias" = "$ANDROID_KEY_ALIAS" ]; then
+              ALIAS_FOUND=true
+              break
+            fi
+          done
+
+          if [ "$ALIAS_FOUND" != true ]; then
+            echo "::error::Keystore opened successfully, but alias '$ANDROID_KEY_ALIAS' was not found."
+            printf 'Available aliases:\n'
+            printf '  %s\n' "${KEYSTORE_ALIASES[@]}"
+            exit 1
+          fi
+
+          echo "ANDROID_KEY_ALIAS=$ANDROID_KEY_ALIAS" >> "$GITHUB_ENV"
+
           {
             echo "storePassword=$ANDROID_KEYSTORE_PASSWORD"
             echo "keyPassword=$ANDROID_KEY_PASSWORD"
@@ -95,7 +144,6 @@ jobs:
       - name: Verify release keystore credentials
         env:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           set -eo pipefail
@@ -114,6 +162,11 @@ jobs:
             exit 1
           fi
 
+          if [ -z "${ANDROID_KEY_ALIAS:-}" ]; then
+            echo "::error::ANDROID_KEY_ALIAS was not provided or detected."
+            exit 1
+          fi
+
           if ! keytool -list \
             -keystore android/app/release.jks \
             -storepass "$ANDROID_KEYSTORE_PASSWORD" \
@@ -121,6 +174,7 @@ jobs:
             > "$RUNNER_TEMP/keystore-alias.log" \
             2>&1; then
             echo "::error::Keystore opened successfully, but alias '$ANDROID_KEY_ALIAS' was not found."
+            awk -F, '/^[^,]+, / {gsub(/^[ \t]+|[ \t]+$/, "", $1); print "  " $1}' "$RUNNER_TEMP/keystore-list.log"
             cat "$RUNNER_TEMP/keystore-alias.log"
             exit 1
           fi

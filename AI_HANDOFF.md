@@ -52,7 +52,7 @@ Generated files are not checked in yet; CI creates them before analysis and APK 
 - Installs Java and Flutter.
 - Runs `flutter create --platforms android --project-name umami_android --org app.blackpirate.umami .` because Android scaffolding is intentionally generated in CI.
 - Decodes `ANDROID_KEYSTORE_BASE64` into `android/app/release.jks`.
-- Verifies the keystore store password, key alias, and key password with `keytool` before build. `ANDROID_KEY_PASSWORD` is optional and defaults to `ANDROID_KEYSTORE_PASSWORD` when omitted.
+- Verifies the keystore store password, key alias, and key password with `keytool` before build. `ANDROID_KEY_ALIAS` is optional when the keystore has exactly one alias; otherwise CI prints the available aliases and fails. `ANDROID_KEY_PASSWORD` is optional and defaults to `ANDROID_KEYSTORE_PASSWORD` when omitted.
 - Writes `android/key.properties` from signing secrets and patches the generated Gradle app file for release signing.
 - Runs `flutter pub get`, codegen, `flutter analyze`, `flutter test`, and `flutter build apk --release`.
 - Uploads `build/app/outputs/flutter-apk/app-release.apk`.
