@@ -53,16 +53,36 @@ jobs:
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          set -euo pipefail
+          set -eo pipefail
 
-          for name in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
-            if [ -z "${!name}" ]; then
-              echo "$name is required."
+          ANDROID_KEY_PASSWORD="${ANDROID_KEY_PASSWORD:-$ANDROID_KEYSTORE_PASSWORD}"
+
+          for name in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error::$name is required."
               exit 1
             fi
           done
 
-          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/app/release.jks
+          if [ -z "$ANDROID_KEY_PASSWORD" ]; then
+            echo "::error::ANDROID_KEY_PASSWORD is empty and cannot default because ANDROID_KEYSTORE_PASSWORD is empty."
+            exit 1
+          fi
+
+          echo "::add-mask::$ANDROID_KEYSTORE_PASSWORD"
+          echo "::add-mask::$ANDROID_KEY_PASSWORD"
+          umask 077
+
+          if ! printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/app/release.jks; then
+            echo "::error::ANDROID_KEYSTORE_BASE64 is not valid base64."
+            exit 1
+          fi
+
+          if [ ! -s android/app/release.jks ]; then
+            echo "::error::Decoded keystore is empty."
+            exit 1
+          fi
+
           chmod 600 android/app/release.jks
 
           {
@@ -78,21 +98,45 @@ jobs:
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          set -euo pipefail
+          set -eo pipefail
 
-          keytool -list \
+          ANDROID_KEY_PASSWORD="${ANDROID_KEY_PASSWORD:-$ANDROID_KEYSTORE_PASSWORD}"
+          echo "::add-mask::$ANDROID_KEYSTORE_PASSWORD"
+          echo "::add-mask::$ANDROID_KEY_PASSWORD"
+
+          if ! keytool -list \
+            -keystore android/app/release.jks \
+            -storepass "$ANDROID_KEYSTORE_PASSWORD" \
+            > "$RUNNER_TEMP/keystore-list.log" \
+            2>&1; then
+            echo "::error::Keystore password is incorrect, or android/app/release.jks is not a readable keystore."
+            cat "$RUNNER_TEMP/keystore-list.log"
+            exit 1
+          fi
+
+          if ! keytool -list \
             -keystore android/app/release.jks \
             -storepass "$ANDROID_KEYSTORE_PASSWORD" \
             -alias "$ANDROID_KEY_ALIAS" \
-            >/dev/null
+            > "$RUNNER_TEMP/keystore-alias.log" \
+            2>&1; then
+            echo "::error::Keystore opened successfully, but alias '$ANDROID_KEY_ALIAS' was not found."
+            cat "$RUNNER_TEMP/keystore-alias.log"
+            exit 1
+          fi
 
-          keytool -certreq \
+          if ! keytool -certreq \
             -keystore android/app/release.jks \
             -storepass "$ANDROID_KEYSTORE_PASSWORD" \
             -keypass "$ANDROID_KEY_PASSWORD" \
             -alias "$ANDROID_KEY_ALIAS" \
             -file "$RUNNER_TEMP/release-key.csr" \
-            >/dev/null
+            > "$RUNNER_TEMP/keystore-keypass.log" \
+            2>&1; then
+            echo "::error::Key password is incorrect for alias '$ANDROID_KEY_ALIAS'."
+            cat "$RUNNER_TEMP/keystore-keypass.log"
+            exit 1
+          fi
 
       - name: Configure Android release signing
         run: |
