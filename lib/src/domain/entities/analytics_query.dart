@@ -20,6 +20,8 @@ extension MetricTypeApiName on MetricType {
   }
 }
 
+const _filterUnset = Object();
+
 enum TimeUnit {
   hour,
   day,
@@ -113,6 +115,17 @@ final class AnalyticsFilters {
   final String? device;
   final String? country;
 
+  bool get isEmpty {
+    return url == null &&
+        referrer == null &&
+        browser == null &&
+        os == null &&
+        device == null &&
+        country == null;
+  }
+
+  bool get isNotEmpty => !isEmpty;
+
   String get cacheKey {
     return [
       url ?? '',
@@ -122,6 +135,28 @@ final class AnalyticsFilters {
       device ?? '',
       country ?? '',
     ].join('|');
+  }
+
+  AnalyticsFilters copyWith({
+    Object? url = _filterUnset,
+    Object? referrer = _filterUnset,
+    Object? browser = _filterUnset,
+    Object? os = _filterUnset,
+    Object? device = _filterUnset,
+    Object? country = _filterUnset,
+  }) {
+    return AnalyticsFilters(
+      url: identical(url, _filterUnset) ? this.url : url as String?,
+      referrer: identical(referrer, _filterUnset)
+          ? this.referrer
+          : referrer as String?,
+      browser:
+          identical(browser, _filterUnset) ? this.browser : browser as String?,
+      os: identical(os, _filterUnset) ? this.os : os as String?,
+      device: identical(device, _filterUnset) ? this.device : device as String?,
+      country:
+          identical(country, _filterUnset) ? this.country : country as String?,
+    );
   }
 
   @override
@@ -207,18 +242,71 @@ final class DashboardRequest {
   const DashboardRequest({
     required this.websiteId,
     required this.range,
+    this.filters = const AnalyticsFilters(),
   });
 
   final String websiteId;
   final AnalyticsDateRange range;
+  final AnalyticsFilters filters;
 
   @override
   bool operator ==(Object other) {
     return other is DashboardRequest &&
         other.websiteId == websiteId &&
-        other.range == range;
+        other.range == range &&
+        other.filters == filters;
   }
 
   @override
-  int get hashCode => Object.hash(websiteId, range);
+  int get hashCode => Object.hash(websiteId, range, filters);
+}
+
+final class SessionsQuery {
+  const SessionsQuery({
+    required this.websiteId,
+    required this.range,
+    this.filters = const AnalyticsFilters(),
+    this.page = 1,
+    this.pageSize = 20,
+    this.search,
+  });
+
+  final String websiteId;
+  final AnalyticsDateRange range;
+  final AnalyticsFilters filters;
+  final int page;
+  final int pageSize;
+  final String? search;
+
+  SessionsQuery nextPage() {
+    return SessionsQuery(
+      websiteId: websiteId,
+      range: range,
+      filters: filters,
+      page: page + 1,
+      pageSize: pageSize,
+      search: search,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is SessionsQuery &&
+        other.websiteId == websiteId &&
+        other.range == range &&
+        other.filters == filters &&
+        other.page == page &&
+        other.pageSize == pageSize &&
+        other.search == search;
+  }
+
+  @override
+  int get hashCode => Object.hash(
+        websiteId,
+        range,
+        filters,
+        page,
+        pageSize,
+        search,
+      );
 }

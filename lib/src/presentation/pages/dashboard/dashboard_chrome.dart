@@ -171,6 +171,90 @@ class _DashboardMessage extends StatelessWidget {
   }
 }
 
+final class _ActiveFilter {
+  const _ActiveFilter({
+    required this.type,
+    required this.label,
+    required this.value,
+  });
+
+  final MetricType type;
+  final String label;
+  final String value;
+}
+
+class _FilterPill extends StatelessWidget {
+  const _FilterPill({
+    required this.label,
+    required this.onClear,
+  });
+
+  final String label;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = ShadTheme.of(context);
+    return ShadButton.outline(
+      onPressed: onClear,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 170),
+            child: Text(
+              label,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.small,
+            ),
+          ),
+          const SizedBox(width: 8),
+          const Icon(LucideIcons.x, size: 14),
+        ],
+      ),
+    );
+  }
+}
+
+class _FilterSheetRow extends StatelessWidget {
+  const _FilterSheetRow({
+    required this.label,
+    required this.value,
+    required this.onClear,
+  });
+
+  final String label;
+  final String value;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = ShadTheme.of(context);
+    return Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: theme.textTheme.small),
+              const SizedBox(height: 3),
+              Text(
+                value,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.p.copyWith(fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+        ),
+        ShadIconButton.ghost(
+          icon: const Icon(LucideIcons.x),
+          onPressed: onClear,
+        ),
+      ],
+    );
+  }
+}
+
 class _LineChartPainter extends CustomPainter {
   const _LineChartPainter({
     required this.points,

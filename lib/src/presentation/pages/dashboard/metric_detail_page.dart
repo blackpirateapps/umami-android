@@ -6,12 +6,16 @@ class _MetricDetailPage extends ConsumerStatefulWidget {
     required this.type,
     required this.website,
     required this.range,
+    required this.filters,
+    required this.onFilter,
   });
 
   final String title;
   final MetricType type;
   final Website website;
   final AnalyticsDateRange range;
+  final AnalyticsFilters filters;
+  final void Function(MetricType type, String value) onFilter;
 
   @override
   ConsumerState<_MetricDetailPage> createState() => _MetricDetailPageState();
@@ -26,6 +30,7 @@ class _MetricDetailPageState extends ConsumerState<_MetricDetailPage> {
       websiteId: widget.website.id,
       range: widget.range,
       type: widget.type,
+      filters: widget.filters,
       limit: 50,
     );
   }
@@ -151,6 +156,7 @@ class _MetricDetailPageState extends ConsumerState<_MetricDetailPage> {
             row: row,
             max: max,
             emptyLabel: _emptyLabel,
+            onTap: () => widget.onFilter(widget.type, row.value),
           ),
         );
       },

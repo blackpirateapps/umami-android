@@ -12,10 +12,12 @@ final class GetWebsiteStatsUseCase {
   Future<Result<Failure, SessionStats>> call({
     required String websiteId,
     required AnalyticsDateRange range,
+    AnalyticsFilters filters = const AnalyticsFilters(),
   }) {
     return _repository.getWebsiteStats(
       websiteId: websiteId,
       range: range,
+      filters: filters,
     );
   }
 }

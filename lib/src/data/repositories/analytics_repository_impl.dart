@@ -4,6 +4,7 @@ import '../../core/network/dio_failure_mapper.dart';
 import '../../domain/entities/analytics_query.dart';
 import '../../domain/entities/dashboard_data.dart';
 import '../../domain/entities/metric_report.dart';
+import '../../domain/entities/session_report.dart';
 import '../../domain/entities/session_stats.dart';
 import '../../domain/entities/time_series_point.dart';
 import '../../domain/entities/website.dart';
@@ -20,6 +21,7 @@ final class AnalyticsRepositoryImpl implements AnalyticsRepository {
     required StatsMapper statsMapper,
     required PageviewsMapper pageviewsMapper,
     required MetricMapper metricMapper,
+    required SessionMapper sessionMapper,
     required DioFailureMapper failureMapper,
   })  : _apiService = apiService,
         _localDataSource = localDataSource,
@@ -27,6 +29,7 @@ final class AnalyticsRepositoryImpl implements AnalyticsRepository {
         _statsMapper = statsMapper,
         _pageviewsMapper = pageviewsMapper,
         _metricMapper = metricMapper,
+        _sessionMapper = sessionMapper,
         _failureMapper = failureMapper;
 
   final UmamiApiService _apiService;
@@ -35,6 +38,7 @@ final class AnalyticsRepositoryImpl implements AnalyticsRepository {
   final StatsMapper _statsMapper;
   final PageviewsMapper _pageviewsMapper;
   final MetricMapper _metricMapper;
+  final SessionMapper _sessionMapper;
   final DioFailureMapper _failureMapper;
 
   @override
@@ -86,23 +90,29 @@ final class AnalyticsRepositoryImpl implements AnalyticsRepository {
   Future<Result<Failure, SessionStats>> getWebsiteStats({
     required String websiteId,
     required AnalyticsDateRange range,
+    AnalyticsFilters filters = const AnalyticsFilters(),
   }) async {
-    final cached = await _localDataSource.readStats(
-      websiteId: websiteId,
-      range: range,
-    );
+    final cached = filters.isEmpty
+        ? await _localDataSource.readStats(
+            websiteId: websiteId,
+            range: range,
+          )
+        : null;
 
     try {
       final dto = await _apiService.getStats(
         websiteId: websiteId,
         range: range,
+        filters: filters,
       );
       final stats = _statsMapper.fromDto(dto);
-      await _localDataSource.upsertStats(
-        websiteId: websiteId,
-        range: range,
-        stats: stats,
-      );
+      if (filters.isEmpty) {
+        await _localDataSource.upsertStats(
+          websiteId: websiteId,
+          range: range,
+          stats: stats,
+        );
+      }
       return Success(stats);
     } on Object catch (error, stackTrace) {
       if (cached != null) {
@@ -117,26 +127,32 @@ final class AnalyticsRepositoryImpl implements AnalyticsRepository {
   Future<Result<Failure, List<TimeSeriesPoint>>> getPageviews({
     required String websiteId,
     required AnalyticsDateRange range,
+    AnalyticsFilters filters = const AnalyticsFilters(),
   }) async {
-    final cached = await _localDataSource.readPageviews(
-      websiteId: websiteId,
-      range: range,
-    );
+    final cached = filters.isEmpty
+        ? await _localDataSource.readPageviews(
+            websiteId: websiteId,
+            range: range,
+          )
+        : null;
 
     try {
       final dto = await _apiService.getPageviews(
         websiteId: websiteId,
         range: range,
+        filters: filters,
       );
       final points = _pageviewsMapper.fromDto(
         dto,
         timezoneOffsetMinutes: range.timezoneOffsetMinutes,
       );
-      await _localDataSource.upsertPageviews(
-        websiteId: websiteId,
-        range: range,
-        points: points,
-      );
+      if (filters.isEmpty) {
+        await _localDataSource.upsertPageviews(
+          websiteId: websiteId,
+          range: range,
+          points: points,
+        );
+      }
       return Success(points);
     } on Object catch (error, stackTrace) {
       if (cached != null) {
@@ -169,6 +185,16 @@ final class AnalyticsRepositoryImpl implements AnalyticsRepository {
   }
 
   @override
+  Future<Result<Failure, SessionReport>> getSessions(SessionsQuery query) async {
+    try {
+      final dto = await _apiService.getSessions(query);
+      return Success(_sessionMapper.fromDto(dto));
+    } on Object catch (error, stackTrace) {
+      return FailureResult(_failureMapper(error, stackTrace));
+    }
+  }
+
+  @override
   Future<Result<Failure, DashboardData>> getDashboard(
     DashboardRequest request,
   ) async {
@@ -176,16 +202,19 @@ final class AnalyticsRepositoryImpl implements AnalyticsRepository {
     final statsFuture = getWebsiteStats(
       websiteId: request.websiteId,
       range: request.range,
+      filters: request.filters,
     );
     final pageviewsFuture = getPageviews(
       websiteId: request.websiteId,
       range: request.range,
+      filters: request.filters,
     );
     final topPagesFuture = getMetrics(
       MetricQuery(
         websiteId: request.websiteId,
         range: request.range,
         type: MetricType.path,
+        filters: request.filters,
         limit: 10,
       ),
     );
@@ -194,6 +223,7 @@ final class AnalyticsRepositoryImpl implements AnalyticsRepository {
         websiteId: request.websiteId,
         range: request.range,
         type: MetricType.referrer,
+        filters: request.filters,
         limit: 10,
       ),
     );
@@ -202,6 +232,7 @@ final class AnalyticsRepositoryImpl implements AnalyticsRepository {
         websiteId: request.websiteId,
         range: request.range,
         type: MetricType.browser,
+        filters: request.filters,
         limit: 10,
       ),
     );
@@ -210,6 +241,7 @@ final class AnalyticsRepositoryImpl implements AnalyticsRepository {
         websiteId: request.websiteId,
         range: request.range,
         type: MetricType.os,
+        filters: request.filters,
         limit: 10,
       ),
     );
@@ -218,6 +250,7 @@ final class AnalyticsRepositoryImpl implements AnalyticsRepository {
         websiteId: request.websiteId,
         range: request.range,
         type: MetricType.device,
+        filters: request.filters,
         limit: 10,
       ),
     );
@@ -226,6 +259,7 @@ final class AnalyticsRepositoryImpl implements AnalyticsRepository {
         websiteId: request.websiteId,
         range: request.range,
         type: MetricType.country,
+        filters: request.filters,
         limit: 250,
       ),
     );

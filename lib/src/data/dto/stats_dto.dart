@@ -18,6 +18,8 @@ class StatsResponseDto with _$StatsResponseDto {
     MetricValueDto? bounces,
     @JsonKey(name: 'totaltime', fromJson: _metricValueFromJson)
     MetricValueDto? totalTime,
+    @JsonKey(fromJson: _comparisonFromJson)
+    StatsComparisonDto? comparison,
   }) = _StatsResponseDto;
 
   factory StatsResponseDto.fromJson(Map<String, dynamic> json) =>
@@ -35,6 +37,21 @@ class MetricValueDto with _$MetricValueDto {
       _$MetricValueDtoFromJson(json);
 }
 
+@freezed
+class StatsComparisonDto with _$StatsComparisonDto {
+  const factory StatsComparisonDto({
+    @JsonKey(fromJson: _nullableNumFromJson) num? visitors,
+    @JsonKey(fromJson: _nullableNumFromJson) num? pageviews,
+    @JsonKey(fromJson: _nullableNumFromJson) num? visits,
+    @JsonKey(fromJson: _nullableNumFromJson) num? bounces,
+    @JsonKey(name: 'totaltime', fromJson: _nullableNumFromJson)
+    num? totalTime,
+  }) = _StatsComparisonDto;
+
+  factory StatsComparisonDto.fromJson(Map<String, dynamic> json) =>
+      _$StatsComparisonDtoFromJson(json);
+}
+
 MetricValueDto? _metricValueFromJson(Object? value) {
   return switch (value) {
     null => null,
@@ -43,6 +60,17 @@ MetricValueDto? _metricValueFromJson(Object? value) {
         Map<String, dynamic>.from(object),
       ),
     _ => MetricValueDto(value: _numFromJson(value)),
+  };
+}
+
+StatsComparisonDto? _comparisonFromJson(Object? value) {
+  return switch (value) {
+    null => null,
+    final Map<String, dynamic> object => StatsComparisonDto.fromJson(object),
+    final Map object => StatsComparisonDto.fromJson(
+        Map<String, dynamic>.from(object),
+      ),
+    _ => null,
   };
 }
 

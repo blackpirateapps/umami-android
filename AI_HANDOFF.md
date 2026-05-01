@@ -23,6 +23,10 @@ This repository is a Flutter Android client for Umami Analytics REST API v2. It 
 - Umami does not expose a conventional refresh-token endpoint. The auth interceptor refreshes expired JWTs by re-posting `/api/auth/login` with credentials stored in `flutter_secure_storage`.
 - Time-series timestamps are normalized through `TimezoneNormalizer` using the user's local timezone offset captured in `AnalyticsDateRange`.
 - Latest Umami API compatibility matters: `GET /api/websites/:id/metrics` uses `type=path`, not the old v2 `type=url`; URL filters are sent as `path`; pageview series requests include `timezone=UTC`; stats and metrics requests intentionally omit `unit`.
+- Dashboard requests now carry `AnalyticsFilters`. Stats, pageviews, metrics, and sessions all send those filters to Umami; filtered stats/pageviews intentionally skip the unfiltered local cache to avoid stale cross-filter fallback.
+- `StatsMapper` preserves both legacy `{value, prev}` stats and current `comparison` stats so dashboard metric cards can show green/red period-over-period percentage changes.
+- The Sessions destination uses `GET /api/websites/:id/sessions` with `page`, `pageSize`, `search`, and filters. Session rows are live-only for now and are not persisted in Drift.
+- Tapping dashboard metric rows for path, referrer, browser, OS, device, or country applies that filter to the active dashboard and sessions queries. Metric detail rows also apply their metric filter and return to the dashboard.
 
 ## Code Generation
 
@@ -55,6 +59,6 @@ Generated files are not checked in yet; CI creates them before analysis and APK 
 ## Next-Agent Checklist
 
 1. Run code generation on a machine with Flutter/Dart.
-2. Validate `shadcn_ui` API compatibility, especially `ShadInput.controller` and icon names from `LucideIcons`.
+2. Validate `shadcn_ui` API compatibility, especially `ShadInput.controller`, `ShadInput.onChanged`, and icon names from `LucideIcons`.
 3. Verify Umami response envelopes against a real v2 instance. `UmamiApiService` accepts plain lists and common `{data/items/results}` envelopes.
 4. Consider adding repository unit tests with mocked `UmamiApiService` and an in-memory Drift executor.

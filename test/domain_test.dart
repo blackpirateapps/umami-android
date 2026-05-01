@@ -3,6 +3,7 @@ import 'package:umami_android/src/domain/entities/analytics_date_range_preset.da
 import 'package:umami_android/src/domain/entities/analytics_query.dart';
 import 'package:umami_android/src/domain/entities/country_traffic.dart';
 import 'package:umami_android/src/domain/entities/metric_report.dart';
+import 'package:umami_android/src/domain/entities/session_stats.dart';
 
 void main() {
   test('last7Days creates an inclusive seven day range', () {
@@ -92,6 +93,48 @@ void main() {
         DashboardRequest(websiteId: websiteId, range: last7),
         isNot(DashboardRequest(websiteId: websiteId, range: last30)),
       );
+    });
+
+    test('filter changes produce distinct dashboard requests', () {
+      final websiteId = 'site-id';
+      final range = const AnalyticsDateRangeSelection.preset(
+        AnalyticsDateRangePreset.last7Days,
+      ).resolve(now: DateTime(2026, 4, 30, 10));
+
+      expect(
+        DashboardRequest(websiteId: websiteId, range: range),
+        isNot(
+          DashboardRequest(
+            websiteId: websiteId,
+            range: range,
+            filters: const AnalyticsFilters(browser: 'Chrome'),
+          ),
+        ),
+      );
+    });
+  });
+
+  group('SessionStats comparisons', () {
+    test('calculates previous-period percentage changes', () {
+      const stats = SessionStats(
+        visitors: 150,
+        pageviews: 250,
+        visits: 200,
+        bounces: 50,
+        totalTimeSeconds: 600,
+        bounceRate: 0.25,
+        previousVisitors: 100,
+        previousPageviews: 200,
+        previousVisits: 100,
+        previousBounces: 40,
+        previousTotalTimeSeconds: 200,
+      );
+
+      expect(stats.visitorsChange, 0.5);
+      expect(stats.pageviewsChange, 0.25);
+      expect(stats.averageVisitSeconds, 3);
+      expect(stats.averageVisitSecondsChange, 0.5);
+      expect(stats.bounceRateChange, closeTo(-0.375, 0.001));
     });
   });
 

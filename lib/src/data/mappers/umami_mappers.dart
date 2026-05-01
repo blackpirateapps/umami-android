@@ -3,11 +3,13 @@ import 'dart:collection';
 import '../../core/time/timezone_normalizer.dart';
 import '../../domain/entities/analytics_query.dart';
 import '../../domain/entities/metric_report.dart';
+import '../../domain/entities/session_report.dart';
 import '../../domain/entities/session_stats.dart';
 import '../../domain/entities/time_series_point.dart';
 import '../../domain/entities/website.dart';
 import '../dto/metric_dto.dart';
 import '../dto/pageviews_dto.dart';
+import '../dto/session_dto.dart';
 import '../dto/stats_dto.dart';
 import '../dto/website_dto.dart';
 import '../local/app_database.dart';
@@ -58,6 +60,21 @@ final class StatsMapper {
       bounces: bounces,
       totalTimeSeconds: totalTime,
       bounceRate: bounceRate,
+      previousVisitors: _toNullableInt(
+        dto.visitors?.prev ?? dto.comparison?.visitors,
+      ),
+      previousPageviews: _toNullableInt(
+        dto.pageviews?.prev ?? dto.comparison?.pageviews,
+      ),
+      previousVisits: _toNullableInt(
+        dto.visits?.prev ?? dto.comparison?.visits,
+      ),
+      previousBounces: _toNullableInt(
+        dto.bounces?.prev ?? dto.comparison?.bounces,
+      ),
+      previousTotalTimeSeconds: _toNullableInt(
+        dto.totalTime?.prev ?? dto.comparison?.totalTime,
+      ),
     );
   }
 
@@ -73,6 +90,8 @@ final class StatsMapper {
   }
 
   int _toInt(num? value) => value?.round() ?? 0;
+
+  int? _toNullableInt(num? value) => value?.round();
 }
 
 final class PageviewsMapper {
@@ -141,6 +160,42 @@ final class MetricMapper {
     return MetricType.values.firstWhere(
       (type) => type.apiName == value,
       orElse: () => MetricType.path,
+    );
+  }
+}
+
+final class SessionMapper {
+  const SessionMapper();
+
+  SessionReport fromDto(SessionsResponseDto dto) {
+    return SessionReport(
+      rows: dto.data
+          .map(
+            (row) => WebsiteSession(
+              id: row.id,
+              websiteId: row.websiteId,
+              hostname: row.hostname,
+              browser: row.browser,
+              os: row.os,
+              device: row.device,
+              screen: row.screen,
+              language: row.language,
+              country: row.country,
+              region: row.region,
+              city: row.city,
+              visits: row.visits,
+              views: row.views,
+              events: row.events,
+              firstAt: row.firstAt,
+              lastAt: row.lastAt,
+              createdAt: row.createdAt,
+            ),
+          )
+          .toList(growable: false),
+      count: dto.count,
+      page: dto.page,
+      pageSize: dto.pageSize,
+      fetchedAt: DateTime.now(),
     );
   }
 }

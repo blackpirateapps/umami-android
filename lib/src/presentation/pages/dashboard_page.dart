@@ -7,6 +7,7 @@ import 'package:shadcn_ui/shadcn_ui.dart';
 import '../../application/providers/auth_controller.dart';
 import '../../application/providers/dashboard_controller.dart';
 import '../../application/providers/metric_page_controller.dart';
+import '../../application/providers/sessions_controller.dart';
 import '../../application/providers/websites_controller.dart';
 import '../../core/error/failure.dart';
 import '../../domain/entities/analytics_date_range_preset.dart';
@@ -15,7 +16,7 @@ import '../../domain/entities/auth_session.dart';
 import '../../domain/entities/country_traffic.dart';
 import '../../domain/entities/dashboard_data.dart';
 import '../../domain/entities/metric_report.dart';
-import '../../domain/entities/session_stats.dart';
+import '../../domain/entities/session_report.dart';
 import '../../domain/entities/time_series_point.dart';
 import '../../domain/entities/website.dart';
 
@@ -25,6 +26,7 @@ part 'dashboard/settings_widgets.dart';
 part 'dashboard/dashboard_chrome.dart';
 part 'dashboard/dashboard_metrics.dart';
 part 'dashboard/analytics_sections.dart';
+part 'dashboard/dashboard_sessions.dart';
 part 'dashboard/metric_detail_page.dart';
 
 const _zinc50 = Color(0xFFFAFAFA);
@@ -88,14 +90,23 @@ class UmamiDashboard extends ConsumerStatefulWidget {
 }
 
 class _UmamiDashboardState extends ConsumerState<UmamiDashboard> {
+  final _sessionSearchController = TextEditingController();
   String? _selectedWebsiteId;
   var _rangeSelection = const AnalyticsDateRangeSelection.preset(
     AnalyticsDateRangePreset.last7Days,
   );
   var _destination = _DashboardDestination.dashboard;
+  var _filters = const AnalyticsFilters();
+  var _sessionsTab = _SessionsTab.activity;
 
   AnalyticsDateRange _activeRange(Website website) {
     return _rangeSelection.resolve(allTimeStartAt: website.createdAt);
+  }
+
+  @override
+  void dispose() {
+    _sessionSearchController.dispose();
+    super.dispose();
   }
 
   @override
@@ -176,12 +187,19 @@ class _UmamiDashboardState extends ConsumerState<UmamiDashboard> {
     final request = DashboardRequest(
       websiteId: activeWebsite.id,
       range: activeRange,
+      filters: _filters,
     );
+    final sessionsQuery = _sessionsQuery(activeWebsite, activeRange);
     final dashboard = ref.watch(dashboardControllerProvider(request));
 
     return RefreshIndicator(
-      onRefresh: () {
-        return ref.read(dashboardControllerProvider(request).notifier).refresh();
+      onRefresh: () async {
+        await ref.read(dashboardControllerProvider(request).notifier).refresh();
+        if (_destination == _DashboardDestination.sessions) {
+          await ref
+              .read(sessionsControllerProvider(sessionsQuery).notifier)
+              .refresh();
+        }
       },
       child: _buildShell(
         slivers: [
@@ -189,6 +207,7 @@ class _UmamiDashboardState extends ConsumerState<UmamiDashboard> {
             websites: websites,
             activeWebsite: activeWebsite,
           ),
+          _buildFilterBar(),
           ...dashboard.when(
             data: (state) {
               return switch (_destination) {
@@ -202,7 +221,7 @@ class _UmamiDashboardState extends ConsumerState<UmamiDashboard> {
                     ),
                   ],
                 _DashboardDestination.sessions => _buildSessionsSlivers(
-                    data: state.data,
+                    activeWebsite: activeWebsite,
                     activeRange: activeRange,
                   ),
                 _DashboardDestination.settings => [_buildSettingsSlivers()],
@@ -283,6 +302,8 @@ class _UmamiDashboardState extends ConsumerState<UmamiDashboard> {
         onChanged: (websiteId) {
           setState(() {
             _selectedWebsiteId = websiteId;
+            _filters = const AnalyticsFilters();
+            _sessionSearchController.clear();
           });
         },
       ),
@@ -348,10 +369,45 @@ class _UmamiDashboardState extends ConsumerState<UmamiDashboard> {
     );
   }
 
+  Widget _buildFilterBar() {
+    final filters = _activeFilters();
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              ShadButton.outline(
+                leading: const Icon(LucideIcons.filter, size: 16),
+                onPressed: _showFiltersSheet,
+                child: const Text('Filter'),
+              ),
+              for (final filter in filters) ...[
+                const SizedBox(width: 8),
+                _FilterPill(
+                  label: '${filter.label}: ${filter.value}',
+                  onClear: () => _clearMetricFilter(filter.type),
+                ),
+              ],
+              if (filters.isNotEmpty) ...[
+                const SizedBox(width: 8),
+                ShadButton.ghost(
+                  onPressed: _clearAllFilters,
+                  child: const Text('Clear'),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildMetricGrid(DashboardData data) {
     final compact = NumberFormat.compact();
     final percent = NumberFormat.percentPattern();
-    final averageSeconds = _averageVisitSeconds(data.stats);
+    final averageSeconds = data.stats.averageVisitSeconds;
 
     return SliverPadding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
@@ -360,28 +416,32 @@ class _UmamiDashboardState extends ConsumerState<UmamiDashboard> {
           crossAxisCount: 2,
           mainAxisSpacing: 12,
           crossAxisSpacing: 12,
-          childAspectRatio: 1.28,
+          childAspectRatio: 1.12,
         ),
         delegate: SliverChildListDelegate.fixed([
           _MetricCard(
             label: 'Views',
             value: compact.format(data.stats.pageviews),
             icon: LucideIcons.chartNoAxesColumn,
+            change: data.stats.pageviewsChange,
           ),
           _MetricCard(
             label: 'Visitors',
             value: compact.format(data.stats.visitors),
             icon: LucideIcons.user,
+            change: data.stats.visitorsChange,
           ),
           _MetricCard(
             label: 'Bounce Rate',
             value: percent.format(data.stats.bounceRate),
             icon: LucideIcons.activity,
+            change: data.stats.bounceRateChange,
           ),
           _MetricCard(
             label: 'Avg. Visit Time',
             value: _formatDuration(averageSeconds),
             icon: LucideIcons.calendarClock,
+            change: data.stats.averageVisitSecondsChange,
           ),
         ]),
       ),
@@ -461,6 +521,7 @@ class _UmamiDashboardState extends ConsumerState<UmamiDashboard> {
           child: _BreakdownSection(
             title: 'Top Pages',
             report: data.topPages,
+            onFilter: _applyMetricFilter,
             onViewAll: () => _openMetricDetail(
               title: 'Top Pages',
               type: MetricType.path,
@@ -475,6 +536,7 @@ class _UmamiDashboardState extends ConsumerState<UmamiDashboard> {
             title: 'Top Referrers',
             report: data.referrers,
             emptyLabel: 'Direct',
+            onFilter: _applyMetricFilter,
             onViewAll: () => _openMetricDetail(
               title: 'Top Referrers',
               type: MetricType.referrer,
@@ -489,6 +551,7 @@ class _UmamiDashboardState extends ConsumerState<UmamiDashboard> {
             browsers: data.browsers,
             operatingSystems: data.operatingSystems,
             devices: data.devices,
+            onFilter: _applyMetricFilter,
             onViewAll: (title, type) => _openMetricDetail(
               title: title,
               type: type,
@@ -501,6 +564,7 @@ class _UmamiDashboardState extends ConsumerState<UmamiDashboard> {
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
           child: _LocationSection(
             countries: data.countries,
+            onFilter: _applyMetricFilter,
             onViewAll: () => _openMetricDetail(
               title: 'Countries',
               type: MetricType.country,
@@ -581,92 +645,34 @@ class _UmamiDashboardState extends ConsumerState<UmamiDashboard> {
   }
 
   List<Widget> _buildSessionsSlivers({
-    required DashboardData data,
+    required Website activeWebsite,
     required AnalyticsDateRange activeRange,
   }) {
-    final compact = NumberFormat.compact();
-    final percent = NumberFormat.percentPattern();
-    final theme = ShadTheme.of(context);
-    final averageSeconds = _averageVisitSeconds(data.stats);
+    final query = _sessionsQuery(activeWebsite, activeRange);
+    final sessions = ref.watch(sessionsControllerProvider(query));
 
     return [
-      SliverPadding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-        sliver: SliverGrid(
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            mainAxisSpacing: 12,
-            crossAxisSpacing: 12,
-            childAspectRatio: 1.22,
-          ),
-          delegate: SliverChildListDelegate.fixed([
-            _SessionMetricCard(
-              label: 'Visits',
-              value: compact.format(data.stats.visits),
-            ),
-            _SessionMetricCard(
-              label: 'Visitors',
-              value: compact.format(data.stats.visitors),
-            ),
-            _SessionMetricCard(
-              label: 'Avg. Duration',
-              value: _formatDuration(averageSeconds),
-            ),
-            _SessionMetricCard(
-              label: 'Bounce Rate',
-              value: percent.format(data.stats.bounceRate),
-            ),
-          ]),
-        ),
-      ),
       SliverToBoxAdapter(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-          child: _SessionTotalsPanel(
-            stats: data.stats,
-            rangeLabel: _rangeSubtitle(activeRange),
-          ),
-        ),
-      ),
-      SliverToBoxAdapter(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
-          child: _DashboardPanel(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _SectionHeading(
-                  title: 'Pageviews Over Time',
-                  trailing: ShadBadge.secondary(
-                    child: Text(compact.format(data.stats.pageviews)),
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(_rangeSubtitle(activeRange), style: theme.textTheme.muted),
-                const SizedBox(height: 18),
-                AspectRatio(
-                  aspectRatio: 1.75,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.muted.withValues(alpha: 0.28),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: theme.colorScheme.border,
-                      ),
-                    ),
-                    child: CustomPaint(
-                      painter: _LineChartPainter(
-                        points: data.pageviews,
-                        lineColor: theme.colorScheme.primary,
-                        gridColor: theme.colorScheme.border,
-                        fillColor:
-                            theme.colorScheme.primary.withValues(alpha: 0.08),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+          child: _SessionsActivityPanel(
+            state: sessions,
+            activeTab: _sessionsTab,
+            searchController: _sessionSearchController,
+            onTabChanged: (tab) {
+              setState(() {
+                _sessionsTab = tab;
+              });
+            },
+            onSearchChanged: (_) {
+              setState(() {});
+            },
+            onRefresh: () =>
+                ref.read(sessionsControllerProvider(query).notifier).refresh(),
+            onLoadMore: () => ref
+                .read(sessionsControllerProvider(query).notifier)
+                .loadNextPage(),
+            onFilter: _applyMetricFilter,
           ),
         ),
       ),
@@ -751,9 +757,162 @@ class _UmamiDashboardState extends ConsumerState<UmamiDashboard> {
             type: type,
             website: website,
             range: range,
+            filters: _filters,
+            onFilter: (filterType, value) {
+              _applyMetricFilter(filterType, value);
+              Navigator.of(context).pop();
+            },
           );
         },
       ),
+    );
+  }
+
+  SessionsQuery _sessionsQuery(Website website, AnalyticsDateRange range) {
+    final search = _sessionSearchController.text.trim();
+    return SessionsQuery(
+      websiteId: website.id,
+      range: range,
+      filters: _filters,
+      pageSize: 20,
+      search: search.isEmpty ? null : search,
+    );
+  }
+
+  void _applyMetricFilter(MetricType type, String value) {
+    final normalized = type == MetricType.country
+        ? value.trim().toUpperCase()
+        : value.trim();
+    setState(() {
+      _filters = switch (type) {
+        MetricType.path => _filters.copyWith(url: normalized),
+        MetricType.referrer => _filters.copyWith(referrer: normalized),
+        MetricType.browser => _filters.copyWith(browser: normalized),
+        MetricType.os => _filters.copyWith(os: normalized),
+        MetricType.device => _filters.copyWith(device: normalized),
+        MetricType.country => _filters.copyWith(country: normalized),
+      };
+    });
+  }
+
+  void _clearMetricFilter(MetricType type) {
+    setState(() {
+      _filters = switch (type) {
+        MetricType.path => _filters.copyWith(url: null),
+        MetricType.referrer => _filters.copyWith(referrer: null),
+        MetricType.browser => _filters.copyWith(browser: null),
+        MetricType.os => _filters.copyWith(os: null),
+        MetricType.device => _filters.copyWith(device: null),
+        MetricType.country => _filters.copyWith(country: null),
+      };
+    });
+  }
+
+  void _clearAllFilters() {
+    setState(() {
+      _filters = const AnalyticsFilters();
+    });
+  }
+
+  List<_ActiveFilter> _activeFilters() {
+    return [
+      if (_filters.url != null)
+        _ActiveFilter(
+          type: MetricType.path,
+          label: 'Path',
+          value: _filterValueLabel(MetricType.path, _filters.url!),
+        ),
+      if (_filters.referrer != null)
+        _ActiveFilter(
+          type: MetricType.referrer,
+          label: 'Referrer',
+          value: _filterValueLabel(MetricType.referrer, _filters.referrer!),
+        ),
+      if (_filters.browser != null)
+        _ActiveFilter(
+          type: MetricType.browser,
+          label: 'Browser',
+          value: _filterValueLabel(MetricType.browser, _filters.browser!),
+        ),
+      if (_filters.os != null)
+        _ActiveFilter(
+          type: MetricType.os,
+          label: 'OS',
+          value: _filterValueLabel(MetricType.os, _filters.os!),
+        ),
+      if (_filters.device != null)
+        _ActiveFilter(
+          type: MetricType.device,
+          label: 'Device',
+          value: _filterValueLabel(MetricType.device, _filters.device!),
+        ),
+      if (_filters.country != null)
+        _ActiveFilter(
+          type: MetricType.country,
+          label: 'Country',
+          value: _filterValueLabel(MetricType.country, _filters.country!),
+        ),
+    ];
+  }
+
+  String _filterValueLabel(MetricType type, String value) {
+    if (type == MetricType.referrer && value.trim().isEmpty) {
+      return 'Direct';
+    }
+    return switch (type) {
+      MetricType.browser => _browserLabel(value),
+      MetricType.device => _deviceLabel(value),
+      MetricType.country => _countryName(value),
+      _ => value.trim().isEmpty ? 'Unknown' : value,
+    };
+  }
+
+  Future<void> _showFiltersSheet() async {
+    final theme = ShadTheme.of(context);
+    final filters = _activeFilters();
+
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text('Filters', style: theme.textTheme.h4),
+                const SizedBox(height: 16),
+                if (filters.isEmpty)
+                  Text('No filters', style: theme.textTheme.muted)
+                else
+                  for (final filter in filters) ...[
+                    _FilterSheetRow(
+                      label: filter.label,
+                      value: filter.value,
+                      onClear: () {
+                        Navigator.of(context).pop();
+                        _clearMetricFilter(filter.type);
+                      },
+                    ),
+                    if (filter != filters.last) const SizedBox(height: 10),
+                  ],
+                if (filters.isNotEmpty) ...[
+                  const SizedBox(height: 18),
+                  ShadButton.outline(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      _clearAllFilters();
+                    },
+                    child: const Text('Clear all'),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -859,10 +1018,6 @@ class _UmamiDashboardState extends ConsumerState<UmamiDashboard> {
     final sameYear = range.startAt.year == range.endAt.year;
     final formatter = sameYear ? DateFormat.MMMd() : DateFormat.yMMMd();
     return '${formatter.format(range.startAt)} - ${formatter.format(range.endAt)}';
-  }
-
-  int _averageVisitSeconds(SessionStats stats) {
-    return stats.visits == 0 ? 0 : stats.totalTimeSeconds ~/ stats.visits;
   }
 
   String _formatDuration(int seconds) {

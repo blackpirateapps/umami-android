@@ -5,11 +5,13 @@ class _MetricCard extends StatelessWidget {
     required this.label,
     required this.value,
     required this.icon,
+    this.change,
   });
 
   final String label;
   final String value;
   final IconData icon;
+  final double? change;
 
   @override
   Widget build(BuildContext context) {
@@ -45,113 +47,49 @@ class _MetricCard extends StatelessWidget {
               style: theme.textTheme.h2.copyWith(fontWeight: FontWeight.w700),
             ),
           ),
+          const SizedBox(height: 6),
+          _MetricChangeLabel(change: change),
         ],
       ),
     );
   }
 }
 
-class _SessionMetricCard extends StatelessWidget {
-  const _SessionMetricCard({
-    required this.label,
-    required this.value,
-  });
+class _MetricChangeLabel extends StatelessWidget {
+  const _MetricChangeLabel({required this.change});
 
-  final String label;
-  final String value;
+  final double? change;
 
   @override
   Widget build(BuildContext context) {
     final theme = ShadTheme.of(context);
-    return _DashboardPanel(
-      padding: const EdgeInsets.all(14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.muted,
-          ),
-          const Spacer(),
-          FittedBox(
-            alignment: Alignment.centerLeft,
-            fit: BoxFit.scaleDown,
-            child: Text(
-              value,
-              style: theme.textTheme.h3.copyWith(fontWeight: FontWeight.w700),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SessionTotalsPanel extends StatelessWidget {
-  const _SessionTotalsPanel({
-    required this.stats,
-    required this.rangeLabel,
-  });
-
-  final SessionStats stats;
-  final String rangeLabel;
-
-  @override
-  Widget build(BuildContext context) {
-    final compact = NumberFormat.compact();
-    return _DashboardPanel(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const _SectionHeading(title: 'Session Summary'),
-          const SizedBox(height: 4),
-          Text(
-            rangeLabel,
-            overflow: TextOverflow.ellipsis,
-            style: ShadTheme.of(context).textTheme.muted,
-          ),
-          const SizedBox(height: 16),
-          _SummaryRow(label: 'Pageviews', value: compact.format(stats.pageviews)),
-          const SizedBox(height: 10),
-          _SummaryRow(label: 'Bounces', value: compact.format(stats.bounces)),
-          const SizedBox(height: 10),
-          _SummaryRow(
-            label: 'Total Time',
-            value: _formatDurationLabel(stats.totalTimeSeconds),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SummaryRow extends StatelessWidget {
-  const _SummaryRow({
-    required this.label,
-    required this.value,
-  });
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = ShadTheme.of(context);
-    return Row(
-      children: [
-        Expanded(
-          child: Text(
-            label,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.muted,
-          ),
+    final value = change;
+    if (value == null) {
+      return Text(
+        'No comparison',
+        overflow: TextOverflow.ellipsis,
+        style: theme.textTheme.small.copyWith(
+          color: theme.colorScheme.mutedForeground,
         ),
-        Text(
-          value,
-          style: theme.textTheme.small.copyWith(fontWeight: FontWeight.w700),
-        ),
-      ],
+      );
+    }
+
+    final formatter = NumberFormat.percentPattern();
+    final label =
+        value > 0 ? '+${formatter.format(value)}' : formatter.format(value);
+    final color = value > 0
+        ? Colors.green.shade600
+        : value < 0
+            ? Colors.red.shade600
+            : theme.colorScheme.mutedForeground;
+
+    return Text(
+      label,
+      overflow: TextOverflow.ellipsis,
+      style: theme.textTheme.small.copyWith(
+        color: color,
+        fontWeight: FontWeight.w700,
+      ),
     );
   }
 }
@@ -193,12 +131,14 @@ class _BreakdownSection extends StatelessWidget {
     required this.title,
     required this.report,
     required this.onViewAll,
+    required this.onFilter,
     this.emptyLabel = 'Unknown',
   });
 
   final String title;
   final MetricReport report;
   final VoidCallback onViewAll;
+  final void Function(MetricType type, String value) onFilter;
   final String emptyLabel;
 
   @override
@@ -230,6 +170,7 @@ class _BreakdownSection extends StatelessWidget {
                 row: row,
                 max: max,
                 emptyLabel: emptyLabel,
+                onTap: () => onFilter(report.type, row.value),
               ),
               if (row != rows.last) const SizedBox(height: 8),
             ],
@@ -244,11 +185,13 @@ class _TrafficRow extends StatelessWidget {
     required this.row,
     required this.max,
     this.emptyLabel = 'Unknown',
+    this.onTap,
   });
 
   final MetricRow row;
   final int max;
   final String emptyLabel;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -257,7 +200,7 @@ class _TrafficRow extends StatelessWidget {
     final factor = (row.count / max).clamp(0.04, 1.0).toDouble();
     final label = row.value.trim().isEmpty ? emptyLabel : row.value;
 
-    return SizedBox(
+    final content = SizedBox(
       height: 40,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(8),
@@ -302,6 +245,19 @@ class _TrafficRow extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+
+    if (onTap == null) {
+      return content;
+    }
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: content,
       ),
     );
   }

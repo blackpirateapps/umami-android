@@ -8,6 +8,7 @@ import '../../domain/entities/analytics_query.dart';
 import '../dto/auth_dto.dart';
 import '../dto/metric_dto.dart';
 import '../dto/pageviews_dto.dart';
+import '../dto/session_dto.dart';
 import '../dto/stats_dto.dart';
 import '../dto/website_dto.dart';
 
@@ -54,10 +55,14 @@ final class UmamiApiService {
   Future<StatsResponseDto> getStats({
     required String websiteId,
     required AnalyticsDateRange range,
+    AnalyticsFilters filters = const AnalyticsFilters(),
   }) async {
     final response = await _dio.get<Object?>(
       '/api/websites/$websiteId/stats',
-      queryParameters: _baseRangeQuery(range),
+      queryParameters: <String, Object?>{
+        ..._baseRangeQuery(range),
+        ..._filterQuery(filters),
+      },
     );
     return StatsResponseDto.fromJson(_readObject(response.data));
   }
@@ -65,10 +70,14 @@ final class UmamiApiService {
   Future<PageviewsResponseDto> getPageviews({
     required String websiteId,
     required AnalyticsDateRange range,
+    AnalyticsFilters filters = const AnalyticsFilters(),
   }) async {
     final response = await _dio.get<Object?>(
       '/api/websites/$websiteId/pageviews',
-      queryParameters: _seriesRangeQuery(range),
+      queryParameters: <String, Object?>{
+        ..._seriesRangeQuery(range),
+        ..._filterQuery(filters),
+      },
     );
     return PageviewsResponseDto.fromJson(_readObject(response.data));
   }
@@ -101,6 +110,35 @@ final class UmamiApiService {
       total: total,
       offset: query.offset,
       limit: query.limit,
+    );
+  }
+
+  Future<SessionsResponseDto> getSessions(SessionsQuery query) async {
+    final response = await _dio.get<Object?>(
+      '/api/websites/${query.websiteId}/sessions',
+      queryParameters: <String, Object?>{
+        ..._baseRangeQuery(query.range),
+        ..._filterQuery(query.filters),
+        'page': query.page,
+        'pageSize': query.pageSize,
+        if (query.search != null && query.search!.trim().isNotEmpty)
+          'search': query.search!.trim(),
+      },
+    );
+
+    final data = response.data;
+    if (data is Map) {
+      return SessionsResponseDto.fromJson(_readObject(data));
+    }
+
+    final rows = _readList(data)
+        .map((item) => SessionDto.fromJson(_readObject(item)))
+        .toList(growable: false);
+    return SessionsResponseDto(
+      data: rows,
+      count: rows.length,
+      page: query.page,
+      pageSize: query.pageSize,
     );
   }
 

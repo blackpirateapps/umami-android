@@ -6,12 +6,14 @@ class _EnvironmentSection extends StatelessWidget {
     required this.operatingSystems,
     required this.devices,
     required this.onViewAll,
+    required this.onFilter,
   });
 
   final MetricReport browsers;
   final MetricReport operatingSystems;
   final MetricReport devices;
   final void Function(String title, MetricType type) onViewAll;
+  final void Function(MetricType type, String value) onFilter;
 
   @override
   Widget build(BuildContext context) {
@@ -25,18 +27,21 @@ class _EnvironmentSection extends StatelessWidget {
             title: 'Browsers',
             report: browsers,
             onViewAll: () => onViewAll('Browsers', MetricType.browser),
+            onFilter: onFilter,
           ),
           const SizedBox(height: 18),
           _MetricPreviewBlock(
             title: 'Operating Systems',
             report: operatingSystems,
             onViewAll: () => onViewAll('Operating Systems', MetricType.os),
+            onFilter: onFilter,
           ),
           const SizedBox(height: 18),
           _MetricPreviewBlock(
             title: 'Devices',
             report: devices,
             onViewAll: () => onViewAll('Devices', MetricType.device),
+            onFilter: onFilter,
           ),
         ],
       ),
@@ -48,10 +53,12 @@ class _LocationSection extends StatelessWidget {
   const _LocationSection({
     required this.countries,
     required this.onViewAll,
+    required this.onFilter,
   });
 
   final MetricReport countries;
   final VoidCallback onViewAll;
+  final void Function(MetricType type, String value) onFilter;
 
   @override
   Widget build(BuildContext context) {
@@ -91,6 +98,7 @@ class _LocationSection extends StatelessWidget {
               _TrafficRow(
                 row: row,
                 max: max,
+                onTap: () => onFilter(countries.type, row.value),
               ),
               if (row != rows.last) const SizedBox(height: 8),
             ],
@@ -189,11 +197,13 @@ class _MetricPreviewBlock extends StatelessWidget {
     required this.title,
     required this.report,
     required this.onViewAll,
+    required this.onFilter,
   });
 
   final String title;
   final MetricReport report;
   final VoidCallback onViewAll;
+  final void Function(MetricType type, String value) onFilter;
 
   @override
   Widget build(BuildContext context) {
@@ -232,6 +242,7 @@ class _MetricPreviewBlock extends StatelessWidget {
             _TrafficRow(
               row: row,
               max: max,
+              onTap: () => onFilter(report.type, row.value),
             ),
             if (row != rows.last) const SizedBox(height: 8),
           ],

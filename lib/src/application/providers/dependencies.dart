@@ -20,6 +20,7 @@ import '../../domain/repositories/auth_repository.dart';
 import '../../domain/use_cases/authenticate_user_use_case.dart';
 import '../../domain/use_cases/get_dashboard_data_use_case.dart';
 import '../../domain/use_cases/get_metric_page_use_case.dart';
+import '../../domain/use_cases/get_sessions_use_case.dart';
 import '../../domain/use_cases/get_website_stats_use_case.dart';
 import '../../domain/use_cases/sync_website_data_use_case.dart';
 
@@ -106,6 +107,11 @@ MetricMapper metricMapper(MetricMapperRef ref) {
 }
 
 @Riverpod(keepAlive: true)
+SessionMapper sessionMapper(SessionMapperRef ref) {
+  return const SessionMapper();
+}
+
+@Riverpod(keepAlive: true)
 UmamiApiService umamiApiService(UmamiApiServiceRef ref) {
   return UmamiApiService(
     dio: ref.watch(dioProvider),
@@ -143,6 +149,7 @@ AnalyticsRepository analyticsRepository(AnalyticsRepositoryRef ref) {
     statsMapper: ref.watch(statsMapperProvider),
     pageviewsMapper: ref.watch(pageviewsMapperProvider),
     metricMapper: ref.watch(metricMapperProvider),
+    sessionMapper: ref.watch(sessionMapperProvider),
     failureMapper: ref.watch(dioFailureMapperProvider),
   );
 }
@@ -178,4 +185,9 @@ GetDashboardDataUseCase getDashboardDataUseCase(
 @Riverpod(keepAlive: true)
 GetMetricPageUseCase getMetricPageUseCase(GetMetricPageUseCaseRef ref) {
   return GetMetricPageUseCase(ref.watch(analyticsRepositoryProvider));
+}
+
+@Riverpod(keepAlive: true)
+GetSessionsUseCase getSessionsUseCase(GetSessionsUseCaseRef ref) {
+  return GetSessionsUseCase(ref.watch(analyticsRepositoryProvider));
 }
