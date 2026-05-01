@@ -379,7 +379,7 @@ class _UmamiDashboardState extends ConsumerState<UmamiDashboard> {
           child: Row(
             children: [
               ShadButton.outline(
-                leading: const Icon(LucideIcons.filter, size: 16),
+                leading: const Icon(Icons.filter_list, size: 16),
                 onPressed: _showFiltersSheet,
                 child: const Text('Filter'),
               ),
