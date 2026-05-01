@@ -51,8 +51,9 @@ Generated files are not checked in yet; CI creates them before analysis and APK 
 
 - Installs Java and Flutter.
 - Runs `flutter create --platforms android --project-name umami_android --org app.blackpirate.umami .` because Android scaffolding is intentionally generated in CI.
-- Creates an ephemeral release keystore with `keytool`.
-- Patches the generated Gradle app file for release signing.
+- Decodes `ANDROID_KEYSTORE_BASE64` into `android/app/release.jks`.
+- Verifies the keystore store password, key alias, and key password with `keytool` before build.
+- Writes `android/key.properties` from signing secrets and patches the generated Gradle app file for release signing.
 - Runs `flutter pub get`, codegen, `flutter analyze`, `flutter test`, and `flutter build apk --release`.
 - Uploads `build/app/outputs/flutter-apk/app-release.apk`.
 
